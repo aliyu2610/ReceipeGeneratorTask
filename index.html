@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tiny Smart Recipe</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:18px;max-width:720px}
+    h1{font-size:1.2rem;margin-bottom:.25rem}
+    .row{display:flex;gap:.5rem;flex-wrap:wrap}
+    input[type=text]{padding:.4rem;border:1px solid #ccc;border-radius:6px}
+    button{padding:.4rem .6rem;border-radius:6px;border:1px solid #888;background:#f5f5f5;cursor:pointer}
+    .card{border:1px solid #eee;padding:.6rem;border-radius:8px;margin-top:.6rem}
+    small{color:#666}
+  </style>
+</head>
+<body>
+  <h1>Tiny Smart Recipe</h1>
+
+  <div class="card">
+    <div><strong>1) Upload ingredient photo</strong></div>
+    <input id="photo" type="file" accept="image/*"/>
+    <div id="labels" style="margin-top:.5rem"></div>
+    <div style="margin-top:.5rem"><small>Uses MobileNet in your browser — images never leave your device.</small></div>
+  </div>
+
+  <div class="card">
+    <div><strong>2) Ingredients (manual + detected)</strong></div>
+    <div style="margin:.5rem 0" class="row">
+      <input id="ingAdd" type="text" placeholder="type ingredient and press Add"/>
+      <button id="addBtn">Add</button>
+      <button id="clearBtn">Clear</button>
+    </div>
+    <div id="ings" style="min-height:1.4rem"></div>
+  </div>
+
+  <div class="card">
+    <div><strong>3) Find recipes</strong></div>
+    <div style="margin:.5rem 0" class="row">
+      <select id="diet"><option value="none">No filter</option><option value="vegetarian">Vegetarian</option></select>
+      <button id="findBtn">Find</button>
+    </div>
+    <div id="results"></div>
+  </div>
+
+<script>
+/* Minimal recipe DB (small). Expand later if needed. */
+const RECIPES = [
+  {id:1,title:"Tomato Pasta",ingredients:["pasta","tomato","garlic","olive oil"],time:20,nut:{cal:480,prot:12}},
+  {id:2,title:"Chana Masala",ingredients:["chickpeas","tomato","onion","garam masala"],time:40,nut:{cal:380,prot:14}},
+  {id:3,title:"Veg Stir Fry",ingredients:["broccoli","carrot","soy sauce","garlic"],time:15,nut:{cal:240,prot:6}},
+  {id:4,title:"Egg Fried Rice",ingredients:["rice","egg","soy sauce","spring onion"],time:20,nut:{cal:520,prot:15}},
+  {id:5,title:"Paneer Curry",ingredients:["paneer","tomato","onion","garam masala"],time:35,nut:{cal:600,prot:20}},
+  {id:6,title:"Chicken Salad",ingredients:["chicken","lettuce","tomato","olive oil"],time:15,nut:{cal:350,prot:28}}
+];
+const SUBS = {egg:["flaxseed"],milk:["almond milk","soy milk"],chicken:["tofu"],paneer:["tofu"]};
+
+/* tiny helpers */
+const el = id => document.getElementById(id);
+let ingredients = [];
+
+function renderIngredients(){
+  el('ings').textContent = ingredients.join(', ') || '—';
+}
+function jaccard(a,b){
+  const A=new Set(a.map(s=>s.toLowerCase())), B=new Set(b.map(s=>s.toLowerCase()));
+  const inter = [...A].filter(x=>B.has(x)).length;
+  const uni = new Set([...A,...B]).size;
+  return uni===0?0:inter/uni;
+}
+
+/* UI actions */
+el('addBtn').onclick = ()=>{ const v=el('ingAdd').value.trim(); if(v){ingredients.push(v.toLowerCase()); el('ingAdd').value=''; renderIngredients();} };
+el('clearBtn').onclick = ()=>{ ingredients=[]; renderIngredients(); el('labels').textContent=''; };
+el('findBtn').onclick = ()=>{
+  const dietary = el('diet').value;
+  const candidates = RECIPES.filter(r=>{
+    if(dietary==='vegetarian'){
+      const meats = ['chicken','beef','pork','fish']; return !r.ingredients.some(i=>meats.includes(i.toLowerCase()));
+    }
+    return true;
+  });
+  const scored = candidates.map(r=>({r,score:jaccard(ingredients,r.ingredients)})).sort((a,b)=>b.score-a.score);
+  const out = scored.slice(0,5).map(s=>{
+    const missing = s.r.ingredients.filter(i=>!ingredients.map(x=>x.toLowerCase()).includes(i.toLowerCase()));
+    const subs = missing.map(m=> (SUBS[m.toLowerCase()]||[]).join(', ') || '-');
+    return `<div style="margin:.5rem 0;border-top:1px dashed #eee;padding-top:.4rem">
+      <strong>${s.r.title} — ${Math.round(s.score*100)}%</strong><br>
+      <small>Ingredients: ${s.r.ingredients.join(', ')}</small><br>
+      <small>Missing: ${missing.join(', ')||'none'}</small><br>
+      <small>Substitutions: ${subs.join(' | ')}</small><br>
+      <small>Time: ${s.r.time} min • Calories: ${s.r.nut.cal} • Protein: ${s.r.nut.prot}g</small>
+    </div>`;
+  }).join('') || '<div style="color:#666">No matches found — try adding ingredients.</div>';
+  el('results').innerHTML = out;
+};
+
+/* Image -> MobileNet */
+let model = null;
+async function loadModel(){ model = await mobilenet.load(); }
+loadModel();
+
+el('photo').addEventListener('change', async e=>{
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  el('labels').textContent = 'Analyzing...';
+  const img = document.createElement('img');
+  img.src = URL.createObjectURL(f);
+  await new Promise(r=>img.onload=r);
+  if(!model){ el('labels').textContent='Model loading...'; await loadModel(); }
+  const preds = await model.classify(img,3);
+  // choose simple labels, split first term (mobilenet returns things like "bell pepper, pepper")
+  const mapped = preds.map(p=>p.className.split(',')[0].toLowerCase());
+  el('labels').innerHTML = 'Detected: ' + mapped.join(', ');
+  // merge into ingredients automatically
+  mapped.forEach(m=>{ if(!ingredients.includes(m)) ingredients.push(m); });
+  renderIngredients();
+});
+</script>
+</body>
+</html>
