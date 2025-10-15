@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Smart Recipe Generator</title>
+<title>Smart Recipe Generator — More Recipes</title>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
 <style>
@@ -12,7 +12,7 @@
     --card: #fff;
     --accent: #4CAF50;
     --text: #222;
-    --border: #ddd;
+    --border: #e6e6e6;
     --radius: 10px;
   }
   body {
@@ -25,26 +25,20 @@
     flex-direction: column;
     align-items: center;
   }
-  h1 {
-    color: var(--accent);
-    margin-bottom: 0.5rem;
-  }
-  .container {
-    width: 100%;
-    max-width: 700px;
-  }
+  h1 { color: var(--accent); margin-bottom: 0.25rem; }
+  .container { width: 100%; max-width: 820px; }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     padding: 1rem 1.2rem;
     margin: 1rem 0;
   }
   input[type="text"], select, input[type="file"] {
-    padding: 0.5rem;
+    padding: 0.55rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 8px;
     width: 100%;
     box-sizing: border-box;
     font-size: 0.95rem;
@@ -53,43 +47,40 @@
     background: var(--accent);
     color: white;
     border: none;
-    border-radius: var(--radius);
+    border-radius: 8px;
     padding: 0.5rem 1rem;
     font-size: 0.95rem;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.18s;
   }
   button:hover { background: #43a047; }
-  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
   .badge {
     background: var(--accent);
     color: white;
-    border-radius: var(--radius);
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
     display: inline-block;
-    margin: 0.2rem;
+    margin: 0.25rem 0.25rem 0 0;
   }
-  .recipe {
-    border-top: 1px solid var(--border);
-    margin-top: 0.8rem;
-    padding-top: 0.8rem;
-  }
+  .recipe { border-top: 1px solid var(--border); margin-top: 0.8rem; padding-top: 0.8rem; }
   .recipe h3 { margin: 0; color: var(--accent); }
   small { color: #555; }
   #labels { color: #444; margin-top: 0.5rem; }
+  @media (max-width:600px){ .row{flex-direction:column} }
 </style>
 </head>
 <body>
   <div class="container">
     <h1>🥗 Smart Recipe Generator</h1>
-    <p style="color:#666">Upload an ingredient photo or type ingredients to find matching recipes!</p>
+    <p style="color:#666;margin-top:0">Now with 24 recipes — upload a photo or type ingredients to find matches.</p>
 
     <div class="card">
       <h2>1️⃣ Upload Ingredient Photo</h2>
       <input id="photo" type="file" accept="image/*"/>
       <div id="labels"></div>
-      <small>Powered by TensorFlow.js MobileNet — runs fully in your browser.</small>
+      <small>Runs in your browser (MobileNet). Images stay local.</small>
     </div>
 
     <div class="card">
@@ -108,6 +99,7 @@
         <select id="diet">
           <option value="none">No dietary filter</option>
           <option value="vegetarian">Vegetarian only</option>
+          <option value="gluten-free">Gluten-free (best-effort)</option>
         </select>
         <button id="findBtn">Find Recipes</button>
       </div>
@@ -116,22 +108,59 @@
   </div>
 
 <script>
-/* Minimal recipe DB */
+/* Expanded recipe DB: 24 recipes across cuisines */
 const RECIPES = [
   {title:"Tomato Pasta",ingredients:["pasta","tomato","garlic","olive oil"],nut:{cal:480,prot:12},time:20},
   {title:"Chana Masala",ingredients:["chickpeas","tomato","onion","garam masala"],nut:{cal:380,prot:14},time:35},
   {title:"Veg Stir Fry",ingredients:["broccoli","carrot","soy sauce","garlic"],nut:{cal:260,prot:7},time:15},
   {title:"Egg Fried Rice",ingredients:["rice","egg","soy sauce","spring onion"],nut:{cal:520,prot:15},time:20},
   {title:"Paneer Curry",ingredients:["paneer","tomato","onion","garam masala"],nut:{cal:600,prot:20},time:30},
-  {title:"Chicken Salad",ingredients:["chicken","lettuce","tomato","olive oil"],nut:{cal:350,prot:28},time:15}
+  {title:"Chicken Salad",ingredients:["chicken","lettuce","tomato","olive oil"],nut:{cal:350,prot:28},time:15},
+  {title:"Garlic Butter Shrimp",ingredients:["shrimp","garlic","butter","lemon"],nut:{cal:320,prot:25},time:12},
+  {title:"Greek Salad",ingredients:["cucumber","tomato","feta","olive oil","olive"],nut:{cal:220,prot:6},time:10},
+  {title:"Pancakes",ingredients:["flour","milk","egg","butter"],nut:{cal:450,prot:9},time:20},
+  {title:"Oatmeal Bowl",ingredients:["oats","milk","banana","honey"],nut:{cal:300,prot:8},time:5},
+  {title:"Beef Stir Fry",ingredients:["beef","bell pepper","soy sauce","garlic"],nut:{cal:480,prot:30},time:18},
+  {title:"Lentil Soup",ingredients:["lentils","carrot","onion","garlic"],nut:{cal:240,prot:12},time:40},
+  {title:"Avocado Toast",ingredients:["bread","avocado","lemon","salt"],nut:{cal:320,prot:6},time:8},
+  {title:"Caprese Salad",ingredients:["tomato","mozzarella","basil","olive oil"],nut:{cal:280,prot:10},time:8},
+  {title:"Mushroom Risotto",ingredients:["rice","mushroom","parmesan","onion"],nut:{cal:520,prot:11},time:40},
+  {title:"Fish Tacos",ingredients:["fish","tortilla","cabbage","lime"],nut:{cal:420,prot:22},time:25},
+  {title:"Dal Tadka",ingredients:["lentils","onion","tomato","turmeric","ghee"],nut:{cal:320,prot:16},time:30},
+  {title:"Aloo Paratha",ingredients:["wheat flour","potato","ghee","salt"],nut:{cal:450,prot:8},time:25},
+  {title:"Hummus",ingredients:["chickpeas","tahini","lemon","garlic"],nut:{cal:160,prot:6},time:10},
+  {title:"Quinoa Salad",ingredients:["quinoa","cucumber","tomato","olive oil"],nut:{cal:340,prot:9},time:20},
+  {title:"Spaghetti Carbonara",ingredients:["pasta","egg","parmesan","bacon"],nut:{cal:700,prot:25},time:25},
+  {title:"Sushi Roll (simple)",ingredients:["rice","nori","cucumber","avocado"],nut:{cal:300,prot:6},time:40},
+  {title:"Tomato Soup",ingredients:["tomato","onion","garlic","cream"],nut:{cal:220,prot:4},time:30},
+  {title:"Vegetable Curry",ingredients:["potato","cauliflower","tomato","cumin"],nut:{cal:360,prot:7},time:35}
 ];
-const SUBS = {egg:["flaxseed"],milk:["almond milk","soy milk"],chicken:["tofu"],paneer:["tofu"]};
 
+/* Expanded substitutions (common cases) */
+const SUBS = {
+  egg:["flaxseed (1 tbsp + 3 tbsp water)","mashed banana"],
+  milk:["almond milk","soy milk","oat milk"],
+  butter:["olive oil","margarine"],
+  chicken:["tofu","jackfruit"],
+  paneer:["tofu"],
+  shrimp:["tofu","mushroom"],
+  bacon:["smoked tofu","mushrooms"],
+  fish:["tofu","tempeh"],
+  flour:["gluten-free flour"],
+  rice:["quinoa","cauliflower rice"],
+  chickpeas:["white beans","lentils"],
+  yogurt:["coconut yogurt","soy yogurt"],
+  parmesan:["nutritional yeast"],
+  tahini:["peanut butter (thin)","sunflower seed butter"],
+  oats:["finely ground rice flakes"]
+};
+
+/* Helpers */
 let ingredients = [];
 const el = id => document.getElementById(id);
 function renderIngredients(){
   el('ings').innerHTML = ingredients.length
-    ? ingredients.map(i=>`<span class='badge'>${i}</span>`).join('')
+    ? ingredients.map(i=>`<span class='badge'>${escapeHtml(i)}</span>`).join('')
     : "<small>No ingredients yet.</small>";
 }
 function jaccard(a,b){
@@ -140,25 +169,31 @@ function jaccard(a,b){
   const uni=new Set([...A,...B]).size;
   return uni?inter/uni:0;
 }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* UI actions */
 el('addBtn').onclick = ()=>{
   const v = el('ingAdd').value.trim().toLowerCase();
   if(v && !ingredients.includes(v)) ingredients.push(v);
   el('ingAdd').value=''; renderIngredients();
 };
-el('clearBtn').onclick = ()=>{ ingredients=[]; renderIngredients(); el('labels').innerText=''; };
+el('clearBtn').onclick = ()=>{ ingredients=[]; renderIngredients(); el('labels').innerText=''; el('results').innerHTML=''; };
 el('findBtn').onclick = ()=>{
   const diet = el('diet').value;
   const meats = ['chicken','beef','pork','fish'];
-  const filtered = diet==='vegetarian'?RECIPES.filter(r=>!r.ingredients.some(i=>meats.includes(i))):RECIPES;
+  const gluten = ['flour','wheat','bread'];
+  let filtered = RECIPES.slice();
+  if(diet==='vegetarian') filtered = filtered.filter(r=>!r.ingredients.some(i=>meats.includes(i)));
+  if(diet==='gluten-free') filtered = filtered.filter(r=>!r.ingredients.some(i=>gluten.includes(i)));
   const scored = filtered.map(r=>({r,score:jaccard(ingredients,r.ingredients)})).sort((a,b)=>b.score-a.score);
   const out = scored.map(s=>{
     const miss = s.r.ingredients.filter(i=>!ingredients.includes(i));
-    const subs = miss.map(m=>SUBS[m] ? SUBS[m].join(', ') : '-').join(' | ');
+    const subs = miss.map(m=>SUBS[m.toLowerCase()] ? SUBS[m.toLowerCase()].join(', ') : '-').join(' | ');
     return `<div class='recipe'>
-      <h3>${s.r.title} (${Math.round(s.score*100)}%)</h3>
-      <small><b>Ingredients:</b> ${s.r.ingredients.join(', ')}</small><br>
-      <small><b>Missing:</b> ${miss.join(', ')||'None'}</small><br>
-      <small><b>Substitutions:</b> ${subs||'-'}</small><br>
+      <h3>${escapeHtml(s.r.title)} (${Math.round(s.score*100)}%)</h3>
+      <small><b>Ingredients:</b> ${escapeHtml(s.r.ingredients.join(', '))}</small><br>
+      <small><b>Missing:</b> ${escapeHtml(miss.join(', ')||'None')}</small><br>
+      <small><b>Substitutions:</b> ${escapeHtml(subs||'-')}</small><br>
       <small><b>Time:</b> ${s.r.time} min • <b>Calories:</b> ${s.r.nut.cal} • <b>Protein:</b> ${s.r.nut.prot}g</small>
     </div>`;
   }).join('') || "<small>No matching recipes found.</small>";
@@ -176,9 +211,9 @@ el('photo').addEventListener('change', async e=>{
   img.src = URL.createObjectURL(f);
   await new Promise(r=>img.onload=r);
   if(!model) await loadModel();
-  const preds = await model.classify(img,3);
+  const preds = await model.classify(img,4);
   const mapped = preds.map(p=>p.className.split(',')[0].toLowerCase());
-  el('labels').innerHTML = `<b>Detected:</b> ${mapped.join(', ')}`;
+  el('labels').innerHTML = `<b>Detected:</b> ${mapped.map(escapeHtml).join(', ')}`;
   mapped.forEach(m=>{ if(!ingredients.includes(m)) ingredients.push(m); });
   renderIngredients();
 });
